@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Qidiruv — Profil Lookup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#06070d;
+    --bg-panel:#12141f;
+    --bg-panel-2:#191c2b;
+    --accent-primary:#5eead4;
+    --accent-primary-dim:rgba(94,234,212,0.18);
+    --accent-secondary:#fbbf24;
+    --text-primary:#f5f5f7;
+    --text-muted:#868ba3;
+    --border-soft:rgba(245,245,247,0.09);
+    --danger:#f87171;
+  }
+
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--bg-deep);
+    color:var(--text-primary);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+    position:relative;
+  }
+
+  /* ---------- Animated background ---------- */
+  .bg-layer{ position:fixed; inset:0; z-index:0; overflow:hidden; }
+  .blob{
+    position:absolute;
+    border-radius:50%;
+    filter:blur(90px);
+    opacity:0.28;
+    animation:float 18s ease-in-out infinite alternate;
+  }
+  .blob.b1{ width:46vw; height:46vw; max-width:560px; max-height:560px; background:var(--accent-primary); top:-12%; left:-10%; }
+  .blob.b2{ width:38vw; height:38vw; max-width:460px; max-height:460px; background:var(--accent-secondary); bottom:-14%; right:-8%; animation-delay:-9s; }
+  .blob.b3{ width:26vw; height:26vw; max-width:320px; max-height:320px; background:#818cf8; top:40%; left:50%; opacity:0.16; animation-delay:-4s; }
+  @keyframes float{
+    0%{ transform:translate(0,0) scale(1); }
+    100%{ transform:translate(5%,7%) scale(1.12); }
+  }
+  .grid-overlay{
+    position:absolute; inset:0;
+    background-image:
+      linear-gradient(var(--border-soft) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border-soft) 1px, transparent 1px);
+    background-size:64px 64px;
+    mask-image:radial-gradient(ellipse at center, black 0%, transparent 72%);
+  }
+
+  /* ---------- Stage ---------- */
+  .stage{
+    position:relative;
+    z-index:2;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:32px 20px;
+  }
+
+  .eyebrow{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:var(--accent-primary);
+    margin-bottom:14px;
+    opacity:0.9;
+  }
+
+  h1.headline{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    font-size:clamp(28px, 5vw, 42px);
+    text-align:center;
+    letter-spacing:-0.01em;
+    margin-bottom:10px;
+    max-width:640px;
+  }
+
+  p.sub{
+    color:var(--text-muted);
+    text-align:center;
+    max-width:440px;
+    font-size:15px;
+    line-height:1.6;
+    margin-bottom:56px;
+  }
+
+  /* ---------- The morphing orb / panel ---------- */
+  .orb-zone{
+    position:relative;
+    width:100%;
+    display:flex;
+    justify-content:center;
+  }
+
+  .morph{
+    position:relative;
+    width:88px;
+    height:88px;
+    border-radius:50%;
+    background:linear-gradient(145deg, var(--bg-panel-2), var(--bg-panel));
+    border:1px solid var(--border-soft);
+    box-shadow:0 0 0 0 var(--accent-primary-dim), 0 20px 60px rgba(0,0,0,0.5);
+    cursor:pointer;
+    transition:
+      width 0.55s cubic-bezier(.2,.9,.25,1),
+      height 0.55s cubic-bezier(.2,.9,.25,1),
+      border-radius 0.5s cubic-bezier(.2,.9,.25,1),
+      box-shadow 0.4s ease,
+      background 0.4s ease;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+  }
+
+  .morph.pulsing{
+    animation:pulse 2.6s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{ box-shadow:0 0 0 0 var(--accent-primary-dim), 0 20px 60px rgba(0,0,0,0.5); }
+    50%{ box-shadow:0 0 0 14px transparent, 0 20px 60px rgba(0,0,0,0.5); }
+  }
+
+  .morph.open{
+    width:min(440px, 90vw);
+    height:auto;
+    min-height:120px;
+    border-radius:24px;
+    cursor:default;
+    align-items:stretch;
+    background:linear-gradient(180deg, var(--bg-panel-2), var(--bg-panel));
+    box-shadow:0 30px 80px rgba(0,0,0,0.55);
+  }
+
+  .orb-icon{
+    width:28px; height:28px;
+    color:var(--text-primary);
+    transition:opacity 0.25s ease, transform 0.25s ease;
+    flex-shrink:0;
+  }
+  .morph.open .orb-icon-wrap{ display:none; }
+
+  .panel-inner{
+    display:none;
+    flex-direction:column;
+    width:100%;
+    padding:22px;
+    opacity:0;
+    transform:translateY(6px);
+    transition:opacity 0.35s ease 0.15s, transform 0.35s ease 0.15s;
+  }
+  .morph.open .panel-inner{
+    display:flex;
+    opacity:1;
+    transform:translateY(0);
+  }
+
+  .panel-header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:18px;
+  }
+  .panel-title{
+    font-family:'Space Grotesk', sans-serif;
+    font-size:15px;
+    font-weight:600;
+    color:var(--text-primary);
+  }
+  .icon-btn{
+    background:none; border:none; cursor:pointer;
+    color:var(--text-muted);
+    width:30px; height:30px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:8px;
+    transition:background 0.2s ease, color 0.2s ease;
+  }
+  .icon-btn:hover{ background:rgba(245,245,247,0.06); color:var(--text-primary); }
+  .icon-btn svg{ width:17px; height:17px; }
+
+  /* step: platform picker */
+  .platform-grid{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:12px;
+  }
+  .platform-btn{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:8px;
+    padding:16px 8px;
+    background:rgba(245,245,247,0.03);
+    border:1px solid var(--border-soft);
+    border-radius:14px;
+    color:var(--text-primary);
+    cursor:pointer;
+    font-family:'Inter', sans-serif;
+    font-size:12.5px;
+    font-weight:600;
+    transition:transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  }
+  .platform-btn:hover{
+    transform:translateY(-3px);
+    border-color:rgba(94,234,212,0.4);
+    background:rgba(94,234,212,0.06);
+  }
+  .platform-btn svg{ width:24px; height:24px; }
+  .platform-btn.instagram svg{ color:#e1306c; }
+  .platform-btn.telegram svg{ color:#2aabee; }
+  .platform-btn.github svg{ color:#f5f5f7; }
+
+  /* step: username input */
+  .input-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:rgba(245,245,247,0.04);
+    border:1px solid var(--border-soft);
+    border-radius:14px;
+    padding:6px 6px 6px 16px;
+  }
+  .input-row .prefix{
+    color:var(--text-muted);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:14px;
+  }
+  .input-row input{
+    flex:1;
+    background:none;
+    border:none;
+    outline:none;
+    color:var(--text-primary);
+    font-family:'Inter', sans-serif;
+    font-size:15px;
+    padding:10px 0;
+  }
+  .input-row input::placeholder{ color:var(--text-muted); }
+  .submit-btn{
+    background:var(--accent-primary);
+    border:none;
+    color:#06070d;
+    width:38px; height:38px;
+    border-radius:10px;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    flex-shrink:0;
+    transition:transform 0.2s ease, background 0.2s ease;
+  }
+  .submit-btn:hover{ transform:scale(1.06); background:#7ff2e0; }
+  .submit-btn:disabled{ opacity:0.4; cursor:not-allowed; transform:none; }
+  .submit-btn svg{ width:17px; height:17px; }
+
+  .step-back{
+    display:flex; align-items:center; gap:6px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12px;
+    color:var(--text-muted);
+    background:none; border:none; cursor:pointer;
+    margin-bottom:14px;
+    align-self:flex-start;
+  }
+  .step-back:hover{ color:var(--text-primary); }
+  .step-back svg{ width:13px; height:13px; }
+
+  .hint{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:11.5px;
+    color:var(--text-muted);
+    margin-top:10px;
+  }
+
+  .error-box{
+    display:none;
+    margin-top:12px;
+    padding:10px 14px;
+    border-radius:10px;
+    background:rgba(248,113,113,0.1);
+    border:1px solid rgba(248,113,113,0.3);
+    color:var(--danger);
+    font-size:13px;
+  }
+  .error-box.show{ display:block; }
+
+  .loading-row{
+    display:none;
+    align-items:center;
+    gap:10px;
+    color:var(--text-muted);
+    font-family:'IBM Plex Mono', monospace;
+    font-size:12.5px;
+    margin-top:14px;
+  }
+  .loading-row.show{ display:flex; }
+  .spinner{
+    width:14px; height:14px;
+    border-radius:50%;
+    border:2px solid var(--border-soft);
+    border-top-color:var(--accent-primary);
+    animation:spin 0.7s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  /* step: results */
+  .result-card{ display:none; flex-direction:column; }
+  .result-top{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-bottom:18px;
+  }
+  .result-avatar{
+    width:56px; height:56px;
+    border-radius:50%;
+    background:var(--bg-panel-2) center/cover no-repeat;
+    border:2px solid var(--border-soft);
+    flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    font-size:18px;
+  }
+  .result-name{ font-weight:700; font-size:15px; }
+  .result-handle{ color:var(--text-muted); font-family:'IBM Plex Mono', monospace; font-size:12.5px; }
+  .demo-badge{
+    font-family:'IBM Plex Mono', monospace;
+    font-size:9.5px;
+    letter-spacing:0.08em;
+    background:rgba(251,191,36,0.14);
+    color:var(--accent-secondary);
+    border:1px solid rgba(251,191,36,0.3);
+    padding:2px 7px;
+    border-radius:6px;
+    margin-left:8px;
+  }
+  .result-bio{
+    font-size:13px;
+    color:var(--text-muted);
+    line-height:1.5;
+    margin-bottom:16px;
+  }
+  .stats-grid{
+    display:grid;
+    grid-template-columns:repeat(3, 1fr);
+    gap:10px;
+    margin-bottom:16px;
+  }
+  .stat{
+    background:rgba(245,245,247,0.03);
+    border:1px solid var(--border-soft);
+    border-radius:12px;
+    padding:12px 8px;
+    text-align:center;
+  }
+  .stat-value{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+    font-size:18px;
+    color:var(--accent-primary);
+  }
+  .stat-label{
+    font-size:10.5px;
+    color:var(--text-muted);
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    margin-top:3px;
+  }
+  .result-actions{
+    display:flex;
+    gap:10px;
+  }
+  .btn-secondary{
+    flex:1;
+    text-align:center;
+    padding:10px;
+    border-radius:10px;
+    border:1px solid var(--border-soft);
+    color:var(--text-primary);
+    text-decoration:none;
+    font-size:12.5px;
+    font-weight:600;
+    transition:background 0.2s ease, border-color 0.2s ease;
+  }
+  .btn-secondary:hover{ background:rgba(245,245,247,0.06); border-color:rgba(94,234,212,0.35); }
+
+  .unavailable-box{
+    background:rgba(251,191,36,0.06);
+    border:1px solid rgba(251,191,36,0.25);
+    border-radius:12px;
+    padding:14px 16px;
+    margin-bottom:16px;
+  }
+  .unavail-title{
+    font-weight:700;
+    font-size:13.5px;
+    color:var(--accent-secondary);
+    margin-bottom:6px;
+  }
+  .unavail-reason{
+    font-size:12.5px;
+    color:var(--text-muted);
+    line-height:1.55;
+    margin-bottom:8px;
+  }
+  .unavail-alt{
+    font-size:12px;
+    color:var(--text-primary);
+    font-family:'IBM Plex Mono', monospace;
+  }
+
+  .note{
+    text-align:center;
+    color:var(--text-muted);
+    font-size:11.5px;
+    margin-top:22px;
+    max-width:420px;
+    line-height:1.6;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .blob, .morph.pulsing{ animation:none; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="bg-layer">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+    <div class="grid-overlay"></div>
+  </div>
+
+  <div class="stage">
+    <p class="eyebrow">Profil qidiruv</p>
+    <h1 class="headline">Istalgan platformadan profil qidiring</h1>
+    <p class="sub">Tugmani bosing, platformani tanlang, foydalanuvchi nomini kiriting — natijalar shu yerda chiqadi.</p>
+
+    <div class="orb-zone">
+      <div class="morph pulsing" id="morph">
+
+        <div class="orb-icon-wrap">
+          <svg class="orb-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        </div>
+
+        <div class="panel-inner">
+
+          <!-- STEP 1: platform picker -->
+          <div class="step" id="step-platform">
+            <div class="panel-header">
+              <span class="panel-title">Qayerdan qidiraylik?</span>
+              <button class="icon-btn" id="close-btn" aria-label="Yopish">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+            <div class="platform-grid">
+              <button class="platform-btn instagram" data-platform="instagram">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.3" cy="6.7" r="1"/></svg>
+                Instagram
+              </button>
+              <button class="platform-btn telegram" data-platform="telegram">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m21 4-18 7 6 2m12-9-4 17-6-6m10-11-8 7"/></svg>
+                Telegram
+              </button>
+              <button class="platform-btn github" data-platform="github">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.34 1.08 2.91.83.09-.65.35-1.08.63-1.33-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.65 0 0 .84-.27 2.75 1.02a9.55 9.55 0 0 1 5 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.38.2 2.4.1 2.65.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85v2.74c0 .27.18.58.69.48A10 10 0 0 0 12 2Z"/></svg>
+                GitHub
+              </button>
+            </div>
+          </div>
+
+          <!-- STEP 2: username input -->
+          <div class="step" id="step-username" style="display:none;">
+            <button class="step-back" id="back-to-platform">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m12 19-7-7 7-7M5 12h14"/></svg>
+              Orqaga
+            </button>
+            <div class="panel-header">
+              <span class="panel-title" id="username-title">Foydalanuvchi nomini kiriting</span>
+            </div>
+            <div class="input-row">
+              <span class="prefix" id="username-prefix">@</span>
+              <input type="text" id="username-input" placeholder="masalan: elonmusk" autocomplete="off">
+              <button class="submit-btn" id="search-submit" disabled aria-label="Qidirish">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+              </button>
+            </div>
+            <div class="loading-row" id="loading-row">
+              <div class="spinner"></div>
+              <span>Qidirilmoqda...</span>
+            </div>
+            <div class="error-box" id="error-box"></div>
+          </div>
+
+          <!-- STEP 3: results -->
+          <div class="step result-card" id="step-result">
+            <button class="step-back" id="back-to-search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m12 19-7-7 7-7M5 12h14"/></svg>
+              Yangi qidiruv
+            </button>
+            <div class="result-top">
+              <div class="result-avatar" id="result-avatar">?</div>
+              <div>
+                <div class="result-name" id="result-name">—<span class="demo-badge" id="demo-badge" style="display:none;">DEMO</span></div>
+                <div class="result-handle" id="result-handle">@—</div>
+              </div>
+            </div>
+            <p class="result-bio" id="result-bio"></p>
+            <div class="stats-grid" id="stats-grid"></div>
+
+            <div class="unavailable-box" id="unavailable-box" style="display:none;">
+              <p class="unavail-title" id="unavail-title"></p>
+              <p class="unavail-reason" id="unavail-reason"></p>
+              <p class="unavail-alt" id="unavail-alt"></p>
+            </div>
+
+            <div class="result-actions">
+              <a class="btn-secondary" id="result-link" href="#" target="_blank" rel="noopener">Profilni ochish ↗</a>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <p class="note">GitHub uchun natijalar (repolar, followerlar, jami yulduzlar, gistlar, akkaunt yoshi) ochiq API orqali real vaqtda olinadi. Telegram — ommaviy kanallar uchun kichik backend orqali haqiqiy obunachilar sonini ko'rsatadi (sozlash kerak, quyida). Instagram esa boshqa foydalanuvchi ma'lumotini ochiq tarzda bermagani sababli, aniq sabab va profilga havola ko'rsatiladi.</p>
+  </div>
+
+<script>
+(function(){
+  // Telegram backend serverini joylashtirgandan so'ng, uning manzilini shu yerga yozing.
+  // Masalan: "https://telegram-lookup-xxxx.onrender.com"
+  const TELEGRAM_BACKEND_URL = "";
+
+  const morph = document.getElementById('morph');
+  const stepPlatform = document.getElementById('step-platform');
+  const stepUsername = document.getElementById('step-username');
+  const stepResult = document.getElementById('step-result');
+  const usernameInput = document.getElementById('username-input');
+  const usernamePrefix = document.getElementById('username-prefix');
+  const usernameTitle = document.getElementById('username-title');
+  const searchSubmit = document.getElementById('search-submit');
+  const loadingRow = document.getElementById('loading-row');
+  const errorBox = document.getElementById('error-box');
+  const closeBtn = document.getElementById('close-btn');
+  const backToPlatform = document.getElementById('back-to-platform');
+  const backToSearch = document.getElementById('back-to-search');
+
+  let currentPlatform = null;
+
+  function openMorph(){
+    morph.classList.add('open');
+    morph.classList.remove('pulsing');
+    showStep('platform');
+  }
+  function closeMorph(){
+    morph.classList.remove('open');
+    morph.classList.add('pulsing');
+    setTimeout(()=>{
+      showStep('platform');
+      usernameInput.value = '';
+      errorBox.classList.remove('show');
+      loadingRow.classList.remove('show');
+    }, 400);
+  }
+
+  function showStep(name){
+    stepPlatform.style.display = name === 'platform' ? 'block' : 'none';
+    stepUsername.style.display = name === 'username' ? 'block' : 'none';
+    stepResult.style.display = name === 'result' ? 'flex' : 'none';
+  }
+
+  morph.addEventListener('click', function(e){
+    if(!morph.classList.contains('open')){
+      openMorph();
+    }
+  });
+
+  closeBtn.addEventListener('click', function(e){
+    e.stopPropagation();
+    closeMorph();
+  });
+
+  document.querySelectorAll('.platform-btn').forEach(btn=>{
+    btn.addEventListener('click', function(e){
+      e.stopPropagation();
+      currentPlatform = btn.dataset.platform;
+      const labels = {
+        instagram:{ prefix:'@', title:'Instagram nikini kiriting', placeholder:'masalan: zuck' },
+        telegram:{ prefix:'@', title:'Telegram foydalanuvchi nomini kiriting', placeholder:'masalan: durov' },
+        github:{ prefix:'@', title:'GitHub foydalanuvchi nomini kiriting', placeholder:'masalan: torvalds' }
+      };
+      const cfg = labels[currentPlatform];
+      usernamePrefix.textContent = cfg.prefix;
+      usernameTitle.textContent = cfg.title;
+      usernameInput.placeholder = cfg.placeholder;
+      showStep('username');
+      setTimeout(()=>usernameInput.focus(), 100);
+    });
+  });
+
+  backToPlatform.addEventListener('click', function(e){
+    e.stopPropagation();
+    showStep('platform');
+  });
+  backToSearch.addEventListener('click', function(e){
+    e.stopPropagation();
+    usernameInput.value='';
+    errorBox.classList.remove('show');
+    showStep('username');
+    setTimeout(()=>usernameInput.focus(), 100);
+  });
+
+  usernameInput.addEventListener('input', function(){
+    searchSubmit.disabled = usernameInput.value.trim().length === 0;
+  });
+  usernameInput.addEventListener('keydown', function(e){
+    if(e.key === 'Enter' && !searchSubmit.disabled) doSearch();
+  });
+  searchSubmit.addEventListener('click', function(e){
+    e.stopPropagation();
+    doSearch();
+  });
+
+  stepUsername.addEventListener('click', e=>e.stopPropagation());
+  stepPlatform.addEventListener('click', e=>e.stopPropagation());
+  stepResult.addEventListener('click', e=>e.stopPropagation());
+
+  function hashString(str){
+    let h = 0;
+    for(let i=0;i<str.length;i++){
+      h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+    }
+    return Math.abs(h);
+  }
+
+  function animateValue(el, end, duration){
+    const start = 0;
+    const startTime = performance.now();
+    function step(now){
+      const progress = Math.min((now - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const val = Math.floor(start + (end - start) * eased);
+      el.textContent = val.toLocaleString('en-US');
+      if(progress < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  function buildStats(stats){
+    const grid = document.getElementById('stats-grid');
+    grid.innerHTML = '';
+    stats.forEach(s=>{
+      const div = document.createElement('div');
+      div.className = 'stat';
+      const val = document.createElement('div');
+      val.className = 'stat-value';
+      val.textContent = '0';
+      const label = document.createElement('div');
+      label.className = 'stat-label';
+      label.textContent = s.label;
+      div.appendChild(val);
+      div.appendChild(label);
+      grid.appendChild(div);
+      animateValue(val, s.value, 900);
+    });
+  }
+
+  function showResult({ avatarUrl, initials, name, handle, bio, stats, link, demo, unavailable }){
+    const avatar = document.getElementById('result-avatar');
+    if(avatarUrl){
+      avatar.style.backgroundImage = `url(${avatarUrl})`;
+      avatar.textContent = '';
+    } else {
+      avatar.style.backgroundImage = 'none';
+      avatar.textContent = initials || '?';
+    }
+    document.getElementById('result-name').firstChild.textContent = name;
+    document.getElementById('demo-badge').style.display = 'none';
+    document.getElementById('result-handle').textContent = handle;
+    document.getElementById('result-bio').textContent = bio || '';
+    document.getElementById('result-link').href = link || '#';
+
+    const unavailBox = document.getElementById('unavailable-box');
+    const statsGrid = document.getElementById('stats-grid');
+
+    if(unavailable){
+      statsGrid.style.display = 'none';
+      unavailBox.style.display = 'block';
+      document.getElementById('unavail-title').textContent = unavailable.title;
+      document.getElementById('unavail-reason').textContent = unavailable.reason;
+      document.getElementById('unavail-alt').textContent = unavailable.alt;
+    } else {
+      unavailBox.style.display = 'none';
+      statsGrid.style.display = 'grid';
+      buildStats(stats);
+    }
+    showStep('result');
+  }
+
+  // Instagram uchun: ochiq, autentifikatsiyasiz API mavjud emas — soxta raqam ko'rsatmaymiz.
+  function unavailableInfo(platform, username){
+    const info = {
+      instagram:{
+        title:'Instagram uchun real vaqtda ma\'lumot olib bo\'lmaydi',
+        reason:'Instagram istalgan foydalanuvchining followerlar sonini ochiq, tizimga kirmasdan olish imkonini beradigan rasmiy API taqdim etmaydi. Rasmiy Instagram Graph API faqat sizga tegishli, ulangan biznes/creator akkaunt ma\'lumotlarini beradi — boshqa birortasining profilini emas.',
+        alt:'Profilni to\'g\'ridan-to\'g\'ri ochib ko\'rishingiz mumkin:'
+      }
+    };
+    return info[platform];
+  }
+
+  async function fetchTelegram(username){
+    if(!TELEGRAM_BACKEND_URL){
+      return {
+        avatarUrl:null,
+        initials:username.slice(0,2).toUpperCase(),
+        name:username,
+        handle:'@'+username,
+        bio:'',
+        stats:[],
+        link:'https://t.me/'+encodeURIComponent(username),
+        unavailable:{
+          title:'Backend hali ulanmagan',
+          reason:'Telegram kanal ma\'lumotlarini real vaqtda olish uchun kichik backend server kerak. Uni joylashtirib, shu faylning boshidagi TELEGRAM_BACKEND_URL qiymatini to\'g\'irlang.',
+          alt:'Hozircha kanalni to\'g\'ridan-to\'g\'ri ochib ko\'rishingiz mumkin:'
+        }
+      };
+    }
+
+    const base = TELEGRAM_BACKEND_URL.replace(/\/$/, '');
+    const res = await fetch(base + '/api/telegram/' + encodeURIComponent(username));
+    const data = await res.json();
+
+    if(!res.ok){
+      throw new Error(data.error || 'Kanal topilmadi yoki xatolik yuz berdi.');
+    }
+
+    return {
+      avatarUrl: data.photoUrl ? base + data.photoUrl : null,
+      initials: username.slice(0,2).toUpperCase(),
+      name: data.title || username,
+      handle: '@' + (data.username || username),
+      bio: data.description || 'Tavsif mavjud emas.',
+      stats:[
+        { label: data.type === 'channel' ? 'Obunachilar' : 'A\'zolar', value: data.memberCount || 0 }
+      ],
+      link: data.link,
+      demo:false
+    };
+  }
+
+  async function fetchGithub(username){
+    const res = await fetch('https://api.github.com/users/' + encodeURIComponent(username));
+    if(!res.ok){
+      throw new Error(res.status === 404 ? 'Bunday foydalanuvchi topilmadi.' : 'Xatolik yuz berdi. Birozdan so\'ng qayta urinib ko\'ring.');
+    }
+    const data = await res.json();
+
+    // Qo'shimcha real statistika uchun repozitoriyalar ro'yxatini olib, yulduzlarni yig'amiz
+    let totalStars = 0;
+    let topRepo = null;
+    try{
+      const reposRes = await fetch('https://api.github.com/users/' + encodeURIComponent(username) + '/repos?per_page=100&sort=updated');
+      if(reposRes.ok){
+        const repos = await reposRes.json();
+        if(Array.isArray(repos)){
+          repos.forEach(r=>{
+            totalStars += (r.stargazers_count || 0);
+            if(!topRepo || (r.stargazers_count||0) > (topRepo.stargazers_count||0)){
+              topRepo = r;
+            }
+          });
+        }
+      }
+    }catch(e){ /* jim ravishda o'tkazamiz, asosiy ma'lumot baribir ko'rsatiladi */ }
+
+    const createdYear = data.created_at ? new Date(data.created_at).getFullYear() : null;
+    const accountAge = createdYear ? (new Date().getFullYear() - createdYear) : null;
+
+    const stats = [
+      { label:'Repozitoriyalar', value:data.public_repos || 0 },
+      { label:'Followerlar', value:data.followers || 0 },
+      { label:'Following', value:data.following || 0 },
+      { label:'Jami yulduzlar', value:totalStars },
+      { label:'Gistlar', value:data.public_gists || 0 }
+    ];
+    if(accountAge !== null){
+      stats.push({ label:'Yosh (yil)', value:accountAge });
+    }
+
+    let bio = data.bio || 'Bio mavjud emas.';
+    if(topRepo){
+      bio += `  ·  Eng mashhur repo: ${topRepo.name} (${topRepo.stargazers_count}★)`;
+    }
+
+    return {
+      avatarUrl:data.avatar_url,
+      initials:null,
+      name:data.name || data.login,
+      handle:'@'+data.login,
+      bio:bio,
+      stats:stats,
+      link:data.html_url,
+      demo:false
+    };
+  }
+
+  async function doSearch(){
+    const username = usernameInput.value.trim().replace(/^@/, '');
+    if(!username) return;
+    errorBox.classList.remove('show');
+    loadingRow.classList.add('show');
+    searchSubmit.disabled = true;
+
+    try{
+      let result;
+      if(currentPlatform === 'github'){
+        result = await fetchGithub(username);
+      } else if(currentPlatform === 'telegram'){
+        result = await fetchTelegram(username);
+      } else {
+        await new Promise(r => setTimeout(r, 300));
+        const info = unavailableInfo(currentPlatform, username);
+        result = {
+          avatarUrl:null,
+          initials:username.slice(0,2).toUpperCase(),
+          name:username,
+          handle:'@'+username,
+          bio:'',
+          stats:[],
+          link:'https://instagram.com/'+encodeURIComponent(username),
+          unavailable:info
+        };
+      }
+      loadingRow.classList.remove('show');
+      showResult(result);
+    } catch(err){
+      loadingRow.classList.remove('show');
+      searchSubmit.disabled = false;
+      errorBox.textContent = err.message || 'Xatolik yuz berdi.';
+      errorBox.classList.add('show');
+    }
+  }
+
+  document.addEventListener('click', function(e){
+    if(morph.classList.contains('open') && !morph.contains(e.target)){
+      closeMorph();
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
